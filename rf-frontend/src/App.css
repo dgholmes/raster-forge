@@ -1,0 +1,204 @@
+/* ============================================================================
+ * App.css — shared layout helpers.
+ * ========================================================================== */
+
+/* Full-bleed map: MapContainer must fill its parent, and its parent must have
+ * an explicit height. `.md-map-fill` is applied to both. */
+.md-map-fill,
+.md-map-fill .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+.leaflet-container {
+  background: #0b0d10;
+  font-family: inherit;
+}
+
+/* The app shell: topbar (fixed height) + a flexible content area below it. */
+.md-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.md-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Floating-panel positioning helpers for the "bars over map" layout. */
+.md-float {
+  position: absolute;
+  z-index: 600;
+}
+.md-float-tl {
+  top: 16px;
+  left: 16px;
+}
+.md-float-tr {
+  top: 16px;
+  right: 16px;
+}
+.md-float-bl {
+  bottom: 16px;
+  left: 16px;
+}
+.md-float-br {
+  bottom: 16px;
+  right: 16px;
+}
+
+/* Leaflet popups inherit our font; colours are set inline per-theme. */
+.leaflet-popup-content {
+  margin: 10px 12px;
+  font-family: inherit;
+}
+
+/* ============================================================================
+ * RasterForge additions
+ * ========================================================================== */
+
+/* Document pages scroll; the map dashboard's full-bleed layout does not. */
+.rf-page {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.rf-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.rf-grid {
+  display: grid;
+  gap: 16px;
+}
+
+/* Scrollbars — 3-4px, transparent track (design system). */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.25);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.45);
+}
+
+@keyframes rf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rf-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rf-pop {
+  0% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes rf-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.rf-spin,
+.rf-spinner {
+  animation: rf-spin 0.9s linear infinite;
+}
+.rf-pulse {
+  animation: rf-pulse 1.6s ease-in-out infinite;
+}
+.rf-card-in {
+  animation: rf-in 0.2s ease both;
+}
+.rf-detail-in {
+  animation: rf-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.rf-row-hover {
+  transition: background 0.12s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-spin,
+  .rf-spinner,
+  .rf-pulse,
+  .rf-card-in,
+  .rf-detail-in,
+  .rf-row-hover {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── Leaflet attribution inside the tile preview ──────────────────────────────
+ * OpenStreetMap's tile usage policy requires visible attribution, so the
+ * control is enabled whenever a basemap is active. Leaflet's default styling
+ * is a white box with black text, which reads as a rendering bug on the dark
+ * theme — these rules match it to the map's glass chips instead.
+ *
+ * Theme is applied in JS rather than via a root class, so the map wrapper
+ * carries rf-map--dark / rf-map--light for CSS to scope against.
+ * -------------------------------------------------------------------------- */
+.rf-map .leaflet-control-attribution {
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 10px;
+  line-height: 1.5;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: none;
+}
+
+.rf-map .leaflet-control-attribution a {
+  text-decoration: none;
+}
+
+.rf-map--dark .leaflet-control-attribution {
+  background: rgba(8, 11, 16, 0.62);
+  color: #aeaeb2;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.rf-map--dark .leaflet-control-attribution a {
+  color: #d0d0d4;
+}
+
+.rf-map--light .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.7);
+  color: #48484a;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.rf-map--light .leaflet-control-attribution a {
+  color: #1c1c1e;
+}

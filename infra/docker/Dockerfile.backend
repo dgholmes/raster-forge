@@ -1,0 +1,37 @@
+# =============================================================================
+# RasterForge backend
+#
+# Based on the official GDAL image, which ships gdalinfo, gdal_translate AND
+# the osgeo_utils package that provides gdal2tiles. That matters: on Windows
+# only QGIS bundles gdal2tiles, and OSGeo4W does not have it at all. Inside
+# this image everything is on PATH, so GDAL_ROOT / GDAL2TILES_PATH are
+# unnecessary and discovery falls through to the system install.
+# =============================================================================
+FROM ghcr.io/osgeo/gdal:ubuntu-small-3.10.3
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUTF8=1
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3-pip curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY rf-backend/requirements.txt ./requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+COPY rf-backend/ /app/
+
+# Storage is a volume: tiles must outlive the container, and Nginx may mount
+# the same path to serve them directly.
+ENV STORAGE_ROOT=/data/rasterforge
+RUN mkdir -p /data/rasterforge
+
+EXPOSE 9010
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://localhost:9010/api/health || exit 1
+
+CMD ["python3", "run.py"]

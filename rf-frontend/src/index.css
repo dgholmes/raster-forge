@@ -1,0 +1,49 @@
+/* ============================================================================
+ * index.css — reset + global shell.
+ * Fonts (Outfit + Pretendard) are loaded via <link> in index.html.
+ * Leaflet's stylesheet is imported here so map tiles/controls render correctly.
+ * ========================================================================== */
+@import 'leaflet/dist/leaflet.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: 'Outfit', 'Pretendard Variable', 'Pretendard', 'Noto Sans KR',
+    system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Topbar WS status "ping" keyframe (used by Topbar). */
+@keyframes md-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}

@@ -1,0 +1,21 @@
+# Build context is the repository root (see infra/docker/docker-compose.yml).
+# Keep host-specific and generated trees out of the images: a Windows .venv
+# or node_modules copied into a Linux image is dead weight at best and a
+# platform-binary mismatch at worst. Secrets and local databases never belong
+# in an image layer.
+.git
+.claude
+docs
+storage
+**/.idea
+**/node_modules
+**/dist
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/*.db
+**/*.sqlite
+**/.env
+**/.env.local

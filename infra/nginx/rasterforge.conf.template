@@ -1,0 +1,155 @@
+# =============================================================================
+# RasterForge — Nginx site configuration
+#
+# Two deployment shapes are supported. Pick ONE tiles block below.
+#
+#   A. Mounted storage (recommended, and what the PRD calls the preferred
+#      architecture): Nginx reads the same volume the worker writes to, so
+#      publishing never copies a byte and tiles are served without touching
+#      the API. Requires Nginx and the worker to share /data/rasterforge.
+#
+#   B. Proxy to the API: Nginx forwards /tiles/ to the Flask app, which
+#      resolves the slug and streams the file. Slower, but works when Nginx
+#      cannot see the storage volume.
+#
+# Storage layout both blocks assume:
+#   /data/rasterforge/datasets/{dataset-uuid}/output/tiles/{z}/{x}/{y}.png
+#
+# The API upstream is a template variable so this one file serves both
+# shapes. The frontend Docker image renders it at container start through the
+# official nginx image's envsubst hook (RF_API_UPSTREAM, default api:9010 —
+# the Compose service name; 127.0.0.1 would point at the web container
+# itself). On a bare-metal host, render it once:
+#
+#   RF_API_UPSTREAM=127.0.0.1:9010 envsubst '${RF_API_UPSTREAM}' \
+#     < rasterforge.conf.template > /etc/nginx/sites-available/rasterforge
+# =============================================================================
+
+upstream rasterforge_api {
+    server ${RF_API_UPSTREAM};
+    keepalive 16;
+}
+
+# Cache the slug -> dataset-uuid lookup so option A does not hit the API per tile.
+proxy_cache_path /var/cache/nginx/rasterforge levels=1:2 keys_zone=rf_slug:10m
+                 max_size=64m inactive=10m use_temp_path=off;
+
+server {
+    listen 80;
+    server_name tiles.example.com;
+
+    # Orthomosaics are large; the upload limit must exceed MAX_UPLOAD_MB.
+    client_max_body_size 8G;
+    # A multi-gigabyte upload over a slow link needs a generous window.
+    client_body_timeout 3600s;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+
+    access_log /var/log/nginx/rasterforge.access.log;
+    error_log  /var/log/nginx/rasterforge.error.log;
+
+    # ── Frontend (built SPA) ──────────────────────────────────────────────
+    root /var/www/rasterforge;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Hashed assets are immutable.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ── API ───────────────────────────────────────────────────────────────
+    location /api/ {
+        proxy_pass http://rasterforge_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;   # stream large downloads instead of spooling
+    }
+
+    # ── SocketIO (live job progress) ──────────────────────────────────────
+    location /socket.io/ {
+        proxy_pass http://rasterforge_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host       $host;
+        proxy_read_timeout 86400s;
+    }
+
+    # =========================================================================
+    # OPTION A — serve tiles straight from the shared volume  (RECOMMENDED)
+    #
+    # The API exposes GET /api/internal/resolve-slug?slug=<slug>, which returns
+    # 200 with an X-Dataset-Id header (or 404). auth_request caches that
+    # lookup, then Nginx serves the file directly from the volume.
+    #
+    # That endpoint is unauthenticated so Nginx need not hold a token — keep it
+    # on an internal interface or firewall it.
+    #
+    # Uncomment this block AND comment out Option B.
+    # =========================================================================
+    #
+    # location ~ ^/tiles/(?<slug>[a-z0-9][a-z0-9-]*)/(?<tilepath>[0-9]+/[0-9]+/[0-9]+\.(png|jpg|jpeg|webp))$ {
+    #     auth_request      /_resolve;
+    #     auth_request_set  $dataset_id $upstream_http_x_dataset_id;
+    #
+    #     alias /data/rasterforge/datasets/$dataset_id/output/tiles/$tilepath;
+    #
+    #     expires 1d;
+    #     add_header Cache-Control "public, max-age=86400";
+    #     add_header Access-Control-Allow-Origin "*";
+    #     access_log off;
+    #
+    #     # A missing tile must be a clean 404 so the client's errorTileUrl
+    #     # (a transparent PNG) shows the layer beneath instead of an error page.
+    #     error_page 404 = @empty_tile;
+    # }
+    #
+    # location = /_resolve {
+    #     internal;
+    #     proxy_pass              http://rasterforge_api/api/internal/resolve-slug?slug=$slug;
+    #     proxy_pass_request_body off;
+    #     proxy_set_header        Content-Length "";
+    #     proxy_cache             rf_slug;
+    #     proxy_cache_key         $slug;
+    #     proxy_cache_valid       200 10m;
+    #     proxy_cache_valid       404 30s;
+    # }
+    #
+    # location @empty_tile {
+    #     return 404;
+    # }
+
+    # =========================================================================
+    # OPTION B — proxy tiles to the API  (DEFAULT: works with no extra setup)
+    # =========================================================================
+    location /tiles/ {
+        proxy_pass http://rasterforge_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # The API already sets Cache-Control: public, max-age=86400.
+        proxy_cache      rf_slug;
+        proxy_cache_key  $request_uri;
+        proxy_cache_valid 200 1d;
+        proxy_cache_valid 404 30s;
+        add_header X-Cache-Status $upstream_cache_status;
+        add_header Access-Control-Allow-Origin "*";
+        access_log off;
+    }
+
+    # Source GeoTIFFs are NEVER served statically. They are reachable only
+    # through the authenticated /api/datasets/{id}/download/source route.
+    location ~ /datasets/.*/(source|working)/ {
+        deny all;
+        return 404;
+    }
+}

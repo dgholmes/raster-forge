@@ -1,0 +1,22 @@
+# Normalise to LF in the repository. RasterForge is developed on Windows and
+# deployed on Linux, so anything the Linux host *executes* must arrive as LF:
+# a CRLF shebang fails with "bad interpreter: /bin/bash^M", and a CRLF git
+# hook never runs at all.
+* text=auto eol=lf
+
+*.sh            text eol=lf
+*.conf          text eol=lf
+*.template      text eol=lf
+Dockerfile*     text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Binary — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.tif binary
+*.tiff binary
+*.zip binary
+*.ico binary

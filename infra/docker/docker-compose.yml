@@ -1,0 +1,73 @@
+# =============================================================================
+# RasterForge — development / single-host deployment.
+#
+#   docker compose -f infra/docker/docker-compose.yml up --build
+#
+# Build context is the repository root so both images can see rf-backend/ and
+# rf-frontend/. Run it from the repo root, or with -f as above.
+# =============================================================================
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.backend
+    environment:
+      # CHANGE THESE before any real deployment.
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      DEMO_MODE: "0"
+
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/rasterforge/rasterforge.db}
+      STORAGE_ROOT: /data/rasterforge
+      TILE_PUBLIC_BASE: ${TILE_PUBLIC_BASE:-http://localhost:8080/tiles}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+
+      MAX_CONCURRENT_RASTER_JOBS: ${MAX_CONCURRENT_RASTER_JOBS:-2}
+      GDAL2TILES_PROCESSES: ${GDAL2TILES_PROCESSES:-2}
+      MIN_FREE_DISK_GB: ${MIN_FREE_DISK_GB:-10}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-8192}
+      FLASK_DEBUG: "0"
+    volumes:
+      - rasterforge-storage:/data/rasterforge
+    ports:
+      - "9010:9010"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+        VITE_TILE_PUBLIC_BASE: ${TILE_PUBLIC_BASE:-http://localhost:8080/tiles}
+        VITE_VWORLD_API_KEY: ${VWORLD_API_KEY:-}
+    depends_on:
+      - api
+    environment:
+      # Where nginx finds the API: the Compose service name, not 127.0.0.1.
+      RF_API_UPSTREAM: api:9010
+    volumes:
+      # Read-only: lets Option A in rasterforge.conf.template serve tiles
+      # straight from the volume the worker writes to.
+      - rasterforge-storage:/data/rasterforge:ro
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  # PostgreSQL is optional. Enable it and point DATABASE_URL at it when
+  # SQLite stops being enough; no application code changes are required.
+  # db:
+  #   image: postgis/postgis:16-3.4
+  #   environment:
+  #     POSTGRES_USER: rasterforge
+  #     POSTGRES_PASSWORD: change-me
+  #     POSTGRES_DB: rasterforge
+  #   volumes:
+  #     - rasterforge-db:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+volumes:
+  rasterforge-storage:
+  # rasterforge-db:
