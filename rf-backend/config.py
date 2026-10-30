@@ -58,6 +58,10 @@ class Config:
     TILE_PUBLIC_BASE = os.environ.get(
         "TILE_PUBLIC_BASE", "http://localhost:9010/tiles"
     ).rstrip("/")
+    # Optional: a directory a static tile host serves (e.g. Apache's /2Dtile).
+    # When set, publishing mirrors each pyramid to <TILE_PUBLISH_DIR>/<slug>/
+    # so TILE_PUBLIC_BASE can point at that host. Empty = serve from storage.
+    TILE_PUBLISH_DIR = os.environ.get("TILE_PUBLISH_DIR", "").strip()
 
     # --- GDAL ---
     # Optional overrides; discovery finds QGIS/OSGeo4W automatically.

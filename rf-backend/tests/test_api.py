@@ -35,6 +35,7 @@ def app(tmp_path, monkeypatch):
         CORS_ORIGINS = "*"
         STORAGE_ROOT = tmp_path / "storage"
         TILE_PUBLIC_BASE = "http://localhost:9005/tiles"
+        TILE_PUBLISH_DIR = str(tmp_path / "2Dtile")
         GDAL_ROOT = ""
         GDAL2TILES_PATH = ""
         GDAL2TILES_PROCESSES = 2
@@ -320,6 +321,13 @@ def test_full_upload_tile_publish_serve_roundtrip(client, auth, app, real_geotif
     assert served.status_code == 200
     assert served.data.startswith(b"\x89PNG")
 
+    # TILE_PUBLISH_DIR is set, so the same pyramid is mirrored under the slug
+    # for a static tile host, with the metadata document beside it.
+    mirror = Path(app.config["TILE_PUBLISH_DIR"]) / detail["slug"]
+    assert (mirror / z / x / y).read_bytes() == served.data
+    assert (mirror / "metadata.json").is_file()
+    assert sum(1 for _ in mirror.rglob("*.png")) == output["tile_count"]
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize("rest", [
@@ -550,7 +558,7 @@ def test_publish_retry_does_not_rerun_processing(client, auth, app, real_geotiff
         assert d.outputs[0].id == before, "republishing must reuse the existing output"
 
 
-def test_renaming_updates_the_published_url(client, auth, real_geotiff):
+def test_renaming_updates_the_published_url(client, auth, app, real_geotiff):
     """The slug is in the advertised URL, so a rename must republish it."""
     ds = _upload(client, auth, real_geotiff).get_json()
     job = client.post(
@@ -567,6 +575,13 @@ def test_renaming_updates_the_published_url(client, auth, real_geotiff):
     detail = client.get(f"/api/datasets/{ds['id']}", headers=auth).get_json()
     assert "main-event-site" in detail["published_output"]["public_url_template"]
     assert client.get("/tiles/main-event-site/14/1/1.png").status_code in (200, 404)
+
+    # The static-host mirror follows the slug, and goes away with the dataset.
+    publish_dir = Path(app.config["TILE_PUBLISH_DIR"])
+    assert not (publish_dir / ds["slug"]).exists()
+    assert (publish_dir / "main-event-site" / "metadata.json").is_file()
+    assert client.delete(f"/api/datasets/{ds['id']}", headers=auth).status_code == 200
+    assert not (publish_dir / "main-event-site").exists()
 
 
 def test_internal_slug_resolution_for_nginx(client, auth, real_geotiff):

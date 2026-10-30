@@ -431,7 +431,7 @@ def run_job(app, job_id: str) -> None:
             processes=int(params_dict.get("processes", 2)),
         )
         timeout_s = app.config["JOB_TIMEOUT_MINUTES"] * 60
-        tile_base = app.config["TILE_PUBLIC_BASE"]
+        publisher = LocalPublisher.from_config(app.config)
 
         source = source_dir(dataset.id, create=False) / "original.tif"
         if not source.is_file():
@@ -538,7 +538,6 @@ def run_job(app, job_id: str) -> None:
         dataset.status = "publishing"
         set_progress(98, "Publishing")
 
-        publisher = LocalPublisher(tile_base)
         try:
             published = publisher.publish(
                 slug=dataset.slug,

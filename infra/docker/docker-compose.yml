@@ -22,6 +22,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/rasterforge/rasterforge.db}
       STORAGE_ROOT: /data/rasterforge
       TILE_PUBLIC_BASE: ${TILE_PUBLIC_BASE:-http://localhost:8080/tiles}
+      # Mirror published pyramids into a static tile host's directory.
+      # Set TILE_PUBLISH_HOST_DIR (in .env next to this file) to that
+      # directory on the host, e.g. /mnt/storage/3Dtile/2Dtile, and point
+      # TILE_PUBLIC_BASE at the host that serves it. Unset = no mirror.
+      TILE_PUBLISH_DIR: ${TILE_PUBLISH_HOST_DIR:+/data/published}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
 
       MAX_CONCURRENT_RASTER_JOBS: ${MAX_CONCURRENT_RASTER_JOBS:-2}
@@ -31,6 +36,9 @@ services:
       FLASK_DEBUG: "0"
     volumes:
       - rasterforge-storage:/data/rasterforge
+      # Bind-mounts TILE_PUBLISH_HOST_DIR when set; otherwise an unused
+      # named volume so the file stays valid without it.
+      - ${TILE_PUBLISH_HOST_DIR:-rasterforge-published}:/data/published
     ports:
       - "9010:9010"
     restart: unless-stopped
@@ -53,7 +61,7 @@ services:
       # straight from the volume the worker writes to.
       - rasterforge-storage:/data/rasterforge:ro
     ports:
-      - "8080:80"
+      - "9011:80"
     restart: unless-stopped
 
   # PostgreSQL is optional. Enable it and point DATABASE_URL at it when
@@ -70,4 +78,5 @@ services:
 
 volumes:
   rasterforge-storage:
+  rasterforge-published:
   # rasterforge-db:

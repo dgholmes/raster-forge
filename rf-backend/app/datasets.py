@@ -32,6 +32,7 @@ from .storage import (
 
 from raster.analysis import decide_nodata, recommend_max_zoom
 from raster.gdal_runner import GdalNotFound
+from raster.publisher import LocalPublisher, PublishError
 from raster.inspect import RasterInfo, RasterInspectionError, inspect_raster
 
 datasets_bp = Blueprint("datasets", __name__, url_prefix="/api/datasets")
@@ -292,12 +293,19 @@ def update_dataset(dataset_id: str):
             return jsonify(body), status
         new_slug = unique_slug(slug, exclude_id=dataset.id)
         if new_slug != dataset.slug:
+            publisher = LocalPublisher.from_config(current_app.config)
+            # The static-host mirror (if any) is keyed by slug: move it first,
+            # so a failure leaves both the DB and the tile host unchanged.
+            try:
+                publisher.rename(dataset.slug, new_slug)
+            except PublishError as exc:
+                body, status = api_error("publish_failed", 500, str(exc))
+                return jsonify(body), status
             dataset.slug = new_slug
             # The advertised URL embeds the slug, so republish the template.
             for output in dataset.outputs:
                 if output.public_url_template:
-                    base = current_app.config["TILE_PUBLIC_BASE"].rstrip("/")
-                    output.public_url_template = f"{base}/{new_slug}/{{z}}/{{x}}/{{y}}.png"
+                    output.public_url_template = publisher.url_template_for(new_slug)
 
     db.session.commit()
     return jsonify(dataset.to_dict()), 200
@@ -329,12 +337,14 @@ def delete_dataset(dataset_id: str):
     print(f"[audit] dataset delete id={dataset.id} slug={dataset.slug} "
           f"by={user.username if user else 'demo'}", flush=True)
 
+    slug = dataset.slug
     db.session.delete(dataset)
     db.session.commit()
     try:
         delete_dataset_tree(dataset_id)
     except PathTraversal:
         pass
+    LocalPublisher.from_config(current_app.config).unpublish(slug)
     return jsonify({"ok": True}), 200
 
 

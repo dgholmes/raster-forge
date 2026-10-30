@@ -214,6 +214,28 @@ frontend image renders it at start-up, defaulting to `api:9010`, the Compose
 service name. On a bare-metal host render it once with `envsubst`, as the
 file's header shows.
 
+### Publishing into an existing static tile host
+
+If tiles should be served by a tile host that already exists (for example an
+Apache directory listing at `http://host:9090/2Dtile/`), set two values in
+`infra/docker/.env` and rebuild:
+
+```
+TILE_PUBLIC_BASE=http://14.54.13.66:9090/2Dtile
+TILE_PUBLISH_HOST_DIR=/mnt/storage/3Dtile/2Dtile
+```
+
+`TILE_PUBLISH_HOST_DIR` is the directory on the Docker host that the tile
+host serves. Compose bind-mounts it into the API container and sets
+`TILE_PUBLISH_DIR`, so every publish mirrors the pyramid to
+`<dir>/<slug>/{z}/{x}/{y}.png` (plus `metadata.json`), atomically: the copy
+lands in a hidden sibling folder and is swapped in when complete. Renaming a
+slug moves the folder; deleting the dataset removes it. Storage under
+`STORAGE_ROOT` stays the source of truth, and the API's own `/tiles/` route
+keeps working. Datasets published before the change keep their old URL until
+they are published again. Outside Docker, set `TILE_PUBLISH_DIR` directly in
+`rf-backend/.env`.
+
 ### Before going live
 
 - [ ] Set real `SECRET_KEY` and `JWT_SECRET_KEY`

@@ -11,3 +11,6 @@ __pycache__/
 .venv/
 venv/
 .idea/
+
+# Generated test rasters (python samples/make_samples.py)
+samples/out/

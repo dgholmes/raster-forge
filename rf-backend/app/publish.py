@@ -55,7 +55,7 @@ def republish(dataset_id: str):
         return jsonify(body), status
 
     meta = dataset.raster_metadata
-    publisher = LocalPublisher(current_app.config["TILE_PUBLIC_BASE"])
+    publisher = LocalPublisher.from_config(current_app.config)
     try:
         result = publisher.publish(
             slug=dataset.slug,
