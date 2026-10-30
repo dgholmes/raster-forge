@@ -371,8 +371,37 @@ const DatasetDetailPage: React.FC = () => {
         {/* ── COMPLETED ──────────────────────────────────────────────────── */}
         {dataset.status === 'completed' && output?.public_url_template && (
           <div style={{ marginBottom: 24 }}>
+            {/* The stored URL is fixed at publish time. If the server's tile
+                host (TILE_PUBLIC_BASE) has moved since, say so instead of
+                leaving a dead URL in the Copy box. */}
+            {!output.public_url_template.startsWith(`${TILE_CONFIG.PUBLIC_BASE}/`) && (
+              <div style={{ marginBottom: 16 }}>
+                <Notice
+                  C={C}
+                  tone="warn"
+                  title="Published at a previous tile address"
+                  action={
+                    <Button C={C} variant="primary" icon={UploadCloud} onClick={retryPublish} disabled={busy}>
+                      Re-publish
+                    </Button>
+                  }
+                >
+                  The tile host is now {TILE_CONFIG.PUBLIC_BASE}. Re-publishing refreshes the
+                  URL and mirrors the tiles to the new host without re-running the processing.
+                </Notice>
+              </div>
+            )}
             <Card C={C}>
-              <PanelTitle C={C}>Preview</PanelTitle>
+              <PanelTitle
+                C={C}
+                right={
+                  <Button C={C} variant="secondary" icon={UploadCloud} onClick={retryPublish} disabled={busy}>
+                    Re-publish
+                  </Button>
+                }
+              >
+                Preview
+              </PanelTitle>
               <TilePreviewMap
                 C={C}
                 tileUrl={output.public_url_template}
